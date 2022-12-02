@@ -21,60 +21,92 @@ class UserSocketUDP {
         }
     }
 
-    public void broadcast(int _id, String _pseudo, String _message) throws IOException {
-        int port = 2504;
-        byte[] message = new byte[50];
-        message = String.valueOf(_id).concat("::").concat(_pseudo).concat("::").concat(_message).getBytes();
-        Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
-        NetworkInterface ni = en.nextElement();
-        InterfaceAddress ia = ni.getInterfaceAddresses().get(1);
-        InetAddress ipAddress = ia.getBroadcast();
-        DatagramPacket packet = new DatagramPacket(message, message.length, ipAddress, port);
-        socketUDP.send(packet);
-        System.out.println(" Broadcast = " + ipAddress.getHostAddress());
+    public void broadcast(int _id, String _pseudo, String _message) {
+        try {
+            int port = 2504;
+            byte[] message = new byte[50];
+            message = String.valueOf(_id).concat("::").concat(_pseudo).concat("::").concat(_message).getBytes();
+            Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+            NetworkInterface ni = en.nextElement();
+            InterfaceAddress ia = ni.getInterfaceAddresses().get(1);
+            InetAddress ipAddress = ia.getBroadcast();
+            DatagramPacket packet = new DatagramPacket(message, message.length, ipAddress, port);
+            socketUDP.send(packet);
+            socketUDP.receive(packet);
+            System.out.println(" Broadcast = " + ipAddress.getHostAddress());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void sendMessage(OnlineUser _user, int _id, String _pseudo, String _message) throws IOException {
-        int port = 2504;
         byte[] message = new byte[50];
         message = String.valueOf(_id).concat("::").concat(_pseudo).concat("::").concat(_message).getBytes();
-        InetAddress ipAddress = _user.getIpAddress();
-        DatagramPacket packet = new DatagramPacket(message, message.length, ipAddress, port);
+        DatagramPacket packet = new DatagramPacket(message, message.length, _user.getIpAddress(), _user.getPort());
         socketUDP.send(packet);
+        System.out.println("Message $" + String.valueOf(_id).concat("::").concat(_pseudo).concat("::").concat(_message)
+                + "$ was sent to " + _user.getId());
     }
 
-    public boolean waitForAggrement() throws IOException {
+    public boolean waitForAggrement() {
         boolean agreed = true;
-        long time = System.currentTimeMillis();
-        // socketUDP.setSoTimeout(2000);
-        byte[] message = new byte[50];
-        DatagramPacket packet = new DatagramPacket(message, message.length);
-        while (System.currentTimeMillis() - time < 5000 && agreed) {
-            socketUDP.receive(packet);
-            String[] data = packet.getData().toString().split("::");
-            if (data[3].compareTo("ok") == 0)
-                agreed = false;
-            user.getUserBookManager().addOnlineUser(Integer.parseInt(data[0]),
-                    new OnlineUser(data[1], Integer.parseInt(data[0]), packet.getAddress(), packet.getPort()));
+        try {
+            long time = System.currentTimeMillis();
+            socketUDP.setSoTimeout(300);
+            byte[] message = new byte[50];
+            DatagramPacket packet = new DatagramPacket(message, message.length);
+            while (System.currentTimeMillis() - time < 2000) {
+                System.out.println("Waiting for Agreement");
+                socketUDP.receive(packet);
+                String[] data = new String(packet.getData(), 0, packet.getLength()).split("::");
+                System.out.println("Message reçu = " + Arrays.toString(data));
+                if (data[2].compareTo("Ok") != 0)
+                    agreed = false;
+                user.getUserBookManager().addOnlineUser(Integer.parseInt(data[0]),
+                        new OnlineUser(data[1], Integer.parseInt(data[0]), packet.getAddress(), packet.getPort()));
+            }
+        } catch (Exception e) {
         }
+        System.out.println("Number of Online User : " + user.getUserBookManager().getUserBook().size());
+
+        // Print all the Online Users
+        // for (OnlineUser b : user.getUserBookManager().getUserBook().values()) {
+        // System.out.println(b);
+        // }
+
         if (!agreed) {
             user.getUserBookManager().deleteAllOnlineUser();
         }
         return agreed;
     }
 
-    public DatagramPacket receiveMessage() throws IOException {
-        boolean agreed = true;
-        byte[] message = new byte[50];
-        DatagramPacket packet = new DatagramPacket(message, message.length);
-        while (agreed) {
-            System.out.println("En attente de la reception des ...");
-            socketUDP.receive(packet);
-            String[] data = packet.getData().toString().split("::");
-            System.out.println("Message reçu = " + Arrays.toString(data));
-            agreed = false;
+    public void receiveMessage() {
+        try {
+            byte[] message = new byte[50];
+            String replyMessage = "None";
+            DatagramPacket packet = new DatagramPacket(message, message.length);
+            while (true) {
+                System.out.println("En attente de la reception des ...");
+                socketUDP.receive(packet);
+                String[] data = new String(packet.getData(), 0, packet.getLength()).split("::");
+                System.out.println("Message reçu = " + Arrays.toString(data));
+                OnlineUser newuser = new OnlineUser(data[1], Integer.parseInt(data[0]), packet.getAddress(),
+                        packet.getPort());
+                if (data[2].equals("Connecting")) {
+                    if (data[1].equals(user.getPseudo())) {
+                        replyMessage = "Not Ok";
+                    } else {
+                        replyMessage = "Ok";
+                    }
+                } else if (data[2].equals("newUser")) {
+                    user.getUserBookManager().addOnlineUser(newuser.getId(), newuser);
+                    System.out.println("Number of Online User : " + user.getUserBookManager().getUserBook().size());
+                    replyMessage = "userAdded";
+                }
+                if(!replyMessage.equals("None")) sendMessage(newuser, user.getId(), user.getPseudo(), replyMessage);
+            }
+        } catch (Exception e) {
         }
-        return packet;
     }
-
 }

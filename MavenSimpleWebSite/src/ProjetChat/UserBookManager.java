@@ -6,6 +6,10 @@ class UserBookManager{
         onlineUserBook = new HashMap<>();
     }
 
+    public HashMap <Integer,OnlineUser> getUserBook(){
+        return onlineUserBook;
+    }
+
     public void addOnlineUser(int _id, OnlineUser _user){
         onlineUserBook.put(_id, _user);
     }

@@ -1,9 +1,9 @@
 import java.net.DatagramPacket;
 
-class MainC {
+class MainS {
     public static void main(String[] args) {
-        User marco = new User(4);
-        marco.modifyPseudo("Marco");
+        User marco = new User(3);
+        marco.modifyPseudo("Walter");
         UserSocketUDP marcSocketUDP = new UserSocketUDP(marco);
         Thread reception = new Thread(() -> marcSocketUDP.receiveMessage());
         reception.start();

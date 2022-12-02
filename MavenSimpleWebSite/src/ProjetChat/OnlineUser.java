@@ -43,4 +43,7 @@ class OnlineUser{
     public void setPort(int _port){
         port = _port;
     }
+    public String toString(){
+        return "Online User with Pseudo " + pseudo + ", Id " + id + ", ipAdress " + ipAddress.getHostAddress() + " and Port " + port;
+    }
 }
